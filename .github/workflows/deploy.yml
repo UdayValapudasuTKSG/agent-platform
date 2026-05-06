@@ -1,0 +1,55 @@
+name: Agent Platform CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  STAGING_BUCKET: ${{ secrets.GCP_PROJECT_ID }}-agent-staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Google Auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-cloud-aiplatform google-cloud-secret-manager tomllib
+
+      - name: Deploy Changed Agents
+        run: |
+          # Logic to find changed folders in agents/
+          CHANGED_AGENTS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^agents/' | cut -d/ -f1,2 | sort -u || true)
+          if [ -n "$CHANGED_AGENTS" ]; then
+            python scripts/deploy_agents.py $CHANGED_AGENTS
+          else
+            echo "No agent changes detected."
+          fi
+
+      - name: Deploy Changed Gateways
+        run: |
+          CHANGED_GATEWAYS=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^interfaces/' | cut -d/ -f1,2 | sort -u || true)
+          for GW in $CHANGED_GATEWAYS; do
+            gcloud builds submit --tag gcr.io/$PROJECT_ID/$(basename $GW) $GW
+            gcloud run deploy $(basename $GW) --image gcr.io/$PROJECT_ID/$(basename $GW) --platform managed --region $REGION --allow-unauthenticated
+          done
