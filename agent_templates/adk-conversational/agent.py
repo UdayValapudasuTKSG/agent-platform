@@ -6,12 +6,9 @@ class Agent(ADKAgent):
             project=project,
             location=location,
             name="adk_conversational_agent",
-
-            description="A helpful assistant built with Google ADK.",
-            instruction="You are a helpful assistant. Use your tools to help the user if available.",
-            model="gemini-1.5-flash",
             tools=[] # Add your Python functions here
         )
+
 
 if __name__ == "__main__":
     import os

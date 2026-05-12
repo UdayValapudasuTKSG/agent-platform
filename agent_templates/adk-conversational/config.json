@@ -1,0 +1,4 @@
+{
+    "model": "gemini-1.5-flash",
+    "description": "A specialized ADK agent with separate configuration."
+}
