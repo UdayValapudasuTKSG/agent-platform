@@ -3,7 +3,14 @@ import sys
 import tomllib
 import vertexai
 from vertexai.preview import reasoning_engines
+from vertexai.preview.reasoning_engines.templates import adk
 from libs.gcp_utils.config import set_agent_resource_name
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+
 
 def deploy_agent(agent_dir):
     agent_name = os.path.basename(agent_dir)
@@ -31,18 +38,30 @@ def deploy_agent(agent_dir):
     
     # 4. Deploy to Reasoning Engine
     print("Creating Reasoning Engine instance...")
+    
+    agent_instance = Agent(project=project, location=location)
+    
+    # If the agent uses the ADK, wrap it in an AdkApp
+    if hasattr(agent_instance, "agent") and "google.adk" in str(type(agent_instance.agent)):
+        print("Detected ADK Agent. Wrapping in AdkApp...")
+        deployable_obj = adk.AdkApp(agent=agent_instance.agent)
+    else:
+        deployable_obj = agent_instance
+
     remote_app = reasoning_engines.ReasoningEngine.create(
-        Agent(project=project, location=location),
+        deployable_obj,
         requirements=requirements,
         display_name=f"agent-{agent_name}",
     )
+
     
     resource_name = remote_app.resource_name
     print(f"Successfully deployed: {resource_name}")
     
-    # 5. Store ID in Secret Manager
+    # 5. Store ID
     set_agent_resource_name(agent_name, resource_name)
-    print(f"Resource name stored in Secret Manager.")
+    print(f"Resource name stored in .env file.")
+
 
 if __name__ == "__main__":
     # In CI, we would pass changed directories

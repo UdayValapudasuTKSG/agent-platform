@@ -3,8 +3,13 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from google.cloud import aiplatform
 from libs.gcp_utils.config import get_agent_resource_name
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI(title="Agent Platform Gateway")
+
 
 class QueryRequest(BaseModel):
     text: str

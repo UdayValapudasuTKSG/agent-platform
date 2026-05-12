@@ -1,0 +1,10 @@
+[project]
+name = "test-adk-agent"
+version = "0.1.0"
+dependencies = [
+    "google-cloud-aiplatform[reasoningengine,langchain]>=1.50.0",
+    "cloudpickle==3.0.0",
+]
+
+[tool.setuptools]
+packages = ["tools"]

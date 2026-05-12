@@ -40,7 +40,8 @@ packages = ["tools"]
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scaffold a new agent.")
     parser.add_argument("--name", required=True, help="Name of the agent")
-    parser.add_argument("--type", choices=["conversational", "multi-agent"], default="conversational", help="Type of agent")
+    parser.add_argument("--type", choices=["conversational", "multi-agent", "adk-conversational"], default="conversational", help="Type of agent")
+
     
     args = parser.parse_args()
     scaffold_agent(args.name, args.type)
