@@ -1,0 +1,4 @@
+{
+    "model": "gemini-1.5-flash",
+    "system_instruction": "You are a specialized conversational agent. Help the user with their requests."
+}

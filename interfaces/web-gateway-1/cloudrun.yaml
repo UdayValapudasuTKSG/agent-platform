@@ -1,0 +1,32 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: web-gateway-1
+  labels:
+    cloud.googleapis.com/location: ${LOCATION_ID}
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: ${SERVICE_ACCOUNT}
+      containers:
+        - image: ${GATEWAY_IMAGE}
+          ports:
+            - name: http1
+              containerPort: 8080
+          env:
+            - name: GOOGLE_CLOUD_PROJECT
+              value: ${PROJECT_ID}
+            - name: GOOGLE_CLOUD_LOCATION
+              value: ${LOCATION_ID}
+          resources:
+            limits:
+              memory: 512Mi
+              cpu: "1"
+  traffic:
+    - percent: 100
+      latestRevision: true

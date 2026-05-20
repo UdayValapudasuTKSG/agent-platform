@@ -1,25 +1,39 @@
 import sys
 import subprocess
-import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
+USAGE = """
+Usage:
+  python scripts/local_run.py gateway               # Start the FastAPI gateway
+  python scripts/local_run.py run   <agent-name>    # CLI chat with an agent (adk run)
+  python scripts/local_run.py web   <agent-name>    # Browser UI for an agent (adk web)
+  python scripts/local_run.py api   <agent-name>    # Local REST API server (adk api_server)
+"""
 
-def run_local(target):
-    if target == "gateway":
+
+def main():
+    if len(sys.argv) < 2:
+        print(USAGE)
+        return
+
+    command = sys.argv[1]
+
+    if command == "gateway":
         print("Starting Gateway locally...")
-        subprocess.run(["python", "interfaces/web-gateway-1/main.py"], env=os.environ)
-    elif target == "agent":
-        agent_name = sys.argv[2] if len(sys.argv) > 2 else "healthcare-supervisor"
-        print(f"Testing Agent '{agent_name}' locally...")
-        subprocess.run(["python", f"agents/{agent_name}/agent.py"], env=os.environ)
+        subprocess.run(["python", "interfaces/web-gateway-1/main.py"])
+
+    elif command in ("run", "web", "api"):
+        agent_name = sys.argv[2] if len(sys.argv) > 2 else "test-adk-agent"
+        agent_path = f"agents/{agent_name}"
+        adk_command = "api_server" if command == "api" else command
+        print(f"Starting '{agent_name}' with: adk {adk_command} {agent_path}")
+        subprocess.run(["adk", adk_command, agent_path])
+
     else:
-        print("Usage: python scripts/local_run.py [gateway|agent <name>]")
+        print(USAGE)
+
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        run_local(sys.argv[1])
-    else:
-        print("Usage: python scripts/local_run.py [gateway|agent <name>]")
+    main()

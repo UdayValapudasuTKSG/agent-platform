@@ -1,19 +1,8 @@
-from libs.core.adk_agent import ADKAgent
+from google.adk.agents import Agent
 
-class Agent(ADKAgent):
-    def __init__(self, project: str, location: str):
-        super().__init__(
-            project=project,
-            location=location,
-            name="adk_conversational_agent",
-            tools=[] # Add your Python functions here
-        )
-
-
-if __name__ == "__main__":
-    import os
-    agent = Agent(
-        project=os.environ.get("GOOGLE_CLOUD_PROJECT", "your-project"),
-        location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-    )
-    print(agent.query("Hello! Who are you?"))
+root_agent = Agent(
+    name="my_agent",
+    model="gemini-2.0-flash",
+    description="A helpful conversational agent.",
+    instruction="You are a helpful assistant. Answer the user's questions clearly and concisely.",
+)

@@ -1,0 +1,229 @@
+stages:
+  - auth
+  - build
+  - deploy
+
+image: google/cloud-sdk
+
+.tags: &tags
+  - cie
+  - dev
+
+################## Global Variables ############################
+variables:
+  PREFIX: ${CI_PROJECT_PATH}
+
+################## Development Configurations ##################
+.dev_variables: &dev_variables
+  WORKSPACE: ${CI_COMMIT_REF_NAME}
+  PROJECT_ID: prj-d-apm0004223-02
+  LOCATION_ID: us-central1
+  SERVICE_ACCOUNT: sa-dev-ba-test@prj-d-apm0004223-02.iam.gserviceaccount.com
+  PROJECT_NUMBER: 1073722687049
+
+################## Production Configurations ###################
+.prd_variables: &prd_variables
+  WORKSPACE: "production"
+  PROJECT_ID: prj-d-apm0004223-02
+  LOCATION_ID: us-central1
+  SERVICE_ACCOUNT: sa-dev-ba-test@prj-d-apm0004223-02.iam.gserviceaccount.com
+  PROJECT_NUMBER: 1073722687049
+
+cache:
+  paths:
+    - .cache/pip
+
+################## Auth ########################################
+gcp-auth:
+  stage: auth
+  image: google/cloud-sdk
+  variables:
+    GOOGLE_APPLICATION_CREDENTIALS: $CI_PROJECT_DIR/.workload_identity.wlconfig
+    <<: *dev_variables
+  id_tokens:
+    WORKLOAD_IDENTITY_TOKEN:
+      aud: https://gitlab.com
+  script:
+    - |-
+      echo $WORKLOAD_IDENTITY_TOKEN > $CI_PROJECT_DIR/.workload_identity.jwt
+      cat << EOF > $GOOGLE_APPLICATION_CREDENTIALS
+      {
+        "type": "external_account",
+        "audience": "//iam.googleapis.com/projects/1007990893850/locations/global/workloadIdentityPools/gitlab-pool-dev/providers/gitlab-provider-dev",
+        "subject_token_type": "urn:ietf:params:oauth:token-type",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "credential_source": {
+          "file": "$CI_PROJECT_DIR/.workload_identity.jwt"
+        },
+        "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/$SERVICE_ACCOUNT:generateAccessToken"
+      }
+      EOF
+  artifacts:
+    paths:
+      - $CI_PROJECT_DIR/.workload_identity.wlconfig
+      - $CI_PROJECT_DIR/.workload_identity.jwt
+    expire_in: 10 minutes
+  tags:
+    *tags
+  environment:
+    name: development
+  only:
+    - branches
+  when: always
+
+################## Reusable jobs ###############################
+
+# Deploys every agent under agents/ to Cloud Run using `adk deploy cloud_run`.
+# The deploy script stores the resulting service URL in Secret Manager.
+.agent:deploy:
+  image: google/cloud-sdk
+  before_script:
+    - export GOOGLE_APPLICATION_CREDENTIALS=$CI_PROJECT_DIR/.workload_identity.wlconfig
+    - apt-get update -qq
+    - apt-get install -y --no-install-recommends python3 python3-venv python3-pip
+    - python3 -m venv /opt/venv
+    - source /opt/venv/bin/activate
+    - pip install -q -r requirements.txt
+    - gcloud auth login --cred-file=$GOOGLE_APPLICATION_CREDENTIALS
+    - gcloud config set project $PROJECT_ID
+  script:
+    - |
+      export PYTHONPATH=$CI_PROJECT_DIR
+      export GOOGLE_CLOUD_PROJECT=$PROJECT_ID
+      export GOOGLE_CLOUD_LOCATION=$LOCATION_ID
+      for agent_dir in agents/*/; do
+        if [ -f "${agent_dir}agent.py" ]; then
+          echo "--- Deploying ${agent_dir} ---"
+          python scripts/deploy_agents.py "${agent_dir}"
+        fi
+      done
+  tags:
+    *tags
+
+# Builds the gateway Docker image via Cloud Build and pushes to Container Registry.
+# Build context is the repo root so the Dockerfile can COPY from libs/.
+.gateway:build:
+  image: google/cloud-sdk
+  before_script:
+    - export GOOGLE_APPLICATION_CREDENTIALS=$CI_PROJECT_DIR/.workload_identity.wlconfig
+    - gcloud auth login --cred-file=$GOOGLE_APPLICATION_CREDENTIALS
+    - gcloud config set project $PROJECT_ID
+  script:
+    - |
+      gcloud builds submit \
+        --config interfaces/web-gateway-1/cloudbuild.yaml \
+        --substitutions _IMAGE_TAG=gcr.io/$PROJECT_ID/web-gateway-1:$CI_COMMIT_SHA \
+        .
+  tags:
+    *tags
+
+# Deploys the gateway to Cloud Run using cloudrun.yaml.
+# Requires gateway:build to have run first so the image exists.
+.gateway:deploy:
+  image: google/cloud-sdk
+  before_script:
+    - export GOOGLE_APPLICATION_CREDENTIALS=$CI_PROJECT_DIR/.workload_identity.wlconfig
+    - apt-get update -qq && apt-get install -y --no-install-recommends gettext-base
+    - gcloud auth login --cred-file=$GOOGLE_APPLICATION_CREDENTIALS
+    - gcloud config set project $PROJECT_ID
+  script:
+    - |
+      export GATEWAY_IMAGE=gcr.io/$PROJECT_ID/web-gateway-1:$CI_COMMIT_SHA
+      envsubst < interfaces/web-gateway-1/cloudrun.yaml \
+        | gcloud run services replace - --region=$LOCATION_ID --project=$PROJECT_ID
+  tags:
+    *tags
+
+################## Development Jobs ############################
+agent:deploy:dev:
+  stage: deploy
+  extends: .agent:deploy
+  variables:
+    <<: *dev_variables
+  needs:
+    - job: gcp-auth
+      artifacts: true
+  environment:
+    name: development/${WORKSPACE}
+  only:
+    - branches
+  except:
+    - master
+  when: manual
+
+gateway:build:dev:
+  stage: build
+  extends: .gateway:build
+  variables:
+    <<: *dev_variables
+  needs:
+    - job: gcp-auth
+      artifacts: true
+  environment:
+    name: development/${WORKSPACE}
+  only:
+    - branches
+  except:
+    - master
+  when: manual
+
+gateway:deploy:dev:
+  stage: deploy
+  extends: .gateway:deploy
+  variables:
+    <<: *dev_variables
+  needs:
+    - job: gcp-auth
+      artifacts: true
+    - job: gateway:build:dev
+  environment:
+    name: development/${WORKSPACE}
+  only:
+    - branches
+  except:
+    - master
+  when: manual
+
+################## Production Jobs #############################
+agent:deploy:prd:
+  stage: deploy
+  extends: .agent:deploy
+  variables:
+    <<: *prd_variables
+  needs:
+    - job: gcp-auth
+      artifacts: true
+  environment:
+    name: production/${WORKSPACE}
+  when: manual
+  only:
+    - master
+
+gateway:build:prd:
+  stage: build
+  extends: .gateway:build
+  variables:
+    <<: *prd_variables
+  needs:
+    - job: gcp-auth
+      artifacts: true
+  environment:
+    name: production/${WORKSPACE}
+  when: manual
+  only:
+    - master
+
+gateway:deploy:prd:
+  stage: deploy
+  extends: .gateway:deploy
+  variables:
+    <<: *prd_variables
+  needs:
+    - job: gcp-auth
+      artifacts: true
+    - job: gateway:build:prd
+  environment:
+    name: production/${WORKSPACE}
+  when: manual
+  only:
+    - master

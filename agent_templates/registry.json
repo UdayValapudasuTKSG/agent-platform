@@ -1,0 +1,25 @@
+{
+    "templates": [
+        {
+            "id": "adk-conversational",
+            "name": "ADK Conversational Agent",
+            "version": "2.0.0",
+            "path": "adk-conversational",
+            "description": "A simple single-agent using Google ADK. Good starting point for most use cases."
+        },
+        {
+            "id": "adk-multi-agent",
+            "name": "ADK Multi-Agent (Supervisor)",
+            "version": "2.0.0",
+            "path": "adk-multi-agent",
+            "description": "A supervisor agent that delegates to specialized sub-agents via ADK's native sub_agents pattern."
+        },
+        {
+            "id": "prompt-chaining",
+            "name": "ADK Prompt Chaining Agent",
+            "version": "2.0.0",
+            "path": "prompt-chaining",
+            "description": "A SequentialAgent that runs LLM calls in order, feeding each output into the next step."
+        }
+    ]
+}

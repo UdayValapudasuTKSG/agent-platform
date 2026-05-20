@@ -1,24 +1,21 @@
-import vertexai
-from vertexai.preview import reasoning_engines
+from google.adk.agents import Agent, SequentialAgent
 
-class Agent:
-    """
-    Base Agent Template.
-    The Reasoning Engine hosts this class and invokes its methods.
-    """
-    def __init__(self, project: str, location: str):
-        self.project = project
-        self.location = location
-        vertexai.init(project=project, location=location)
+_step_one = Agent(
+    name="step_one",
+    model="gemini-2.0-flash",
+    description="First step: analyzes input and extracts key points.",
+    instruction="Analyze the following input and extract the key points clearly and concisely.",
+)
 
-    def query(self, input_text: str):
-        """
-        Main entry point for the agent.
-        """
-        # Implement your logic here
-        return f"Agent Response to: {input_text}"
+_step_two = Agent(
+    name="step_two",
+    model="gemini-2.0-flash",
+    description="Second step: generates a structured response from the key points.",
+    instruction="Based on the key points provided, generate a well-structured and informative response.",
+)
 
-if __name__ == "__main__":
-    # Local testing
-    agent = Agent(project="your-project", location="us-central1")
-    print(agent.query("Hello!"))
+root_agent = SequentialAgent(
+    name="prompt_chaining_agent",
+    description="A prompt-chaining agent that runs steps in sequence, feeding each output into the next.",
+    sub_agents=[_step_one, _step_two],
+)

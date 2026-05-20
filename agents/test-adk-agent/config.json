@@ -1,0 +1,5 @@
+{
+    "model": "gemini-1.5-flash",
+    "description": "A helpful assistant built with Google ADK.",
+    "system_instruction": "You are a helpful assistant. Use your tools to help the user if available."
+}

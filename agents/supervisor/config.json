@@ -1,0 +1,4 @@
+{
+    "model": "gemini-1.5-flash",
+    "system_instruction": "You are a helpful supervisor agent. You coordinate research and writing tasks. Use the tools provided when asked to research or write summaries."
+}

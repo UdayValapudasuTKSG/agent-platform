@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"C:\\\\Users\\\\UdayValapudasu\\\\OneDrive - The Ksquare Group\\\\Desktop\\\\Projects\\\\Agent Platform\"; Get-ChildItem -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\Users\\\\UdayValapudasu\\\\OneDrive - The Ksquare Group\\\\Desktop\\\\Projects\\\\Agent Platform\\\\\", \"\"\\).Replace\\(\"C:\\\\Users\\\\UdayValapudasu\\\\OneDrive - The Ksquare Group\\\\Desktop\\\\Projects\\\\Agent Platform\", \".\"\\) } | Sort-Object)",
+      "Bash(python -m venv .venv)",
+      "Bash(.venv\\\\Scripts\\\\pip install *)",
+      "Bash(where python3 *)",
+      "Bash(where py *)",
+      "Bash(where python *)",
+      "Bash(\"C:\\\\Users\\\\UdayValapudasu\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python3.exe\" -m venv .venv)",
+      "Bash(\".venv/Scripts/pip\" install *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\UdayValapudasu\\\\OneDrive - The Ksquare Group\\\\Desktop\\\\Projects\\\\Agent Platform\" -Directory)",
+      "Bash(Select-Object Name)"
+    ]
+  }
+}

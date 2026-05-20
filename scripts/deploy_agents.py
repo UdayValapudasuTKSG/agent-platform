@@ -1,77 +1,64 @@
 import os
 import sys
-import tomllib
-import vertexai
-from vertexai.preview import reasoning_engines
-from vertexai.preview.reasoning_engines.templates import adk
-from libs.gcp_utils.config import set_agent_resource_name
+import subprocess
+from libs.gcp_utils.config import set_agent_url
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
 
 
-def deploy_agent(agent_dir):
-    agent_name = os.path.basename(agent_dir)
-    print(f"--- Deploying Agent: {agent_name} ---")
-    
-    # 1. Parse pyproject.toml for requirements
-    pyproject_path = os.path.join(agent_dir, "pyproject.toml")
-    with open(pyproject_path, "rb") as f:
-        config = tomllib.load(f)
-    
-    requirements = config.get("project", {}).get("dependencies", [])
-    print(f"Requirements: {requirements}")
-    
-    # 2. Import the Agent class dynamically
-    # Add agent_dir to sys.path
-    sys.path.append(agent_dir)
-    from agent import Agent
-    
-    # 3. Initialize Vertex AI
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
-    staging_bucket = os.environ.get("STAGING_BUCKET")
-    
-    vertexai.init(project=project, location=location, staging_bucket=staging_bucket)
-    
-    # 4. Deploy to Reasoning Engine
-    print("Creating Reasoning Engine instance...")
-    
-    agent_instance = Agent(project=project, location=location)
-    
-    # If the agent uses the ADK, wrap it in an AdkApp
-    if hasattr(agent_instance, "agent") and "google.adk" in str(type(agent_instance.agent)):
-        print("Detected ADK Agent. Wrapping in AdkApp...")
-        deployable_obj = adk.AdkApp(agent=agent_instance.agent)
-    else:
-        deployable_obj = agent_instance
+def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    print(f"  $ {' '.join(cmd)}")
+    return subprocess.run(cmd, check=True, **kwargs)
 
-    remote_app = reasoning_engines.ReasoningEngine.create(
-        deployable_obj,
-        requirements=requirements,
-        display_name=f"agent-{agent_name}",
+
+def _get_service_url(service_name: str, project: str, region: str) -> str:
+    result = _run(
+        [
+            "gcloud", "run", "services", "describe", service_name,
+            f"--project={project}",
+            f"--region={region}",
+            "--format=value(status.url)",
+        ],
+        capture_output=True,
+        text=True,
     )
+    return result.stdout.strip()
 
-    
-    resource_name = remote_app.resource_name
-    print(f"Successfully deployed: {resource_name}")
-    
-    # 5. Store ID
-    set_agent_resource_name(agent_name, resource_name)
-    print(f"Resource name stored in .env file.")
+
+def deploy_agent(agent_dir: str):
+    agent_name = os.path.basename(agent_dir.rstrip("/\\"))
+    service_name = f"agent-{agent_name}"
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+    region = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+    print(f"\n--- Deploying Agent: {agent_name} -> Cloud Run service: {service_name} ---")
+
+    _run([
+        "adk", "deploy", "cloud_run",
+        f"--project={project}",
+        f"--region={region}",
+        f"--service-name={service_name}",
+        "--allow-unauthenticated",
+        agent_dir,
+    ])
+
+    url = _get_service_url(service_name, project, region)
+    set_agent_url(agent_name, url)
+    print(f"Deployed {agent_name}: {url}")
 
 
 if __name__ == "__main__":
-    # In CI, we would pass changed directories
     if len(sys.argv) > 1:
         for dir_path in sys.argv[1:]:
             deploy_agent(dir_path)
     else:
-        # Default: deploy all agents in agents/
         agents_root = "agents"
-        for folder in os.listdir(agents_root):
+        for folder in sorted(os.listdir(agents_root)):
             path = os.path.join(agents_root, folder)
-            if os.path.isdir(path):
+            if os.path.isdir(path) and os.path.exists(os.path.join(path, "agent.py")):
                 deploy_agent(path)

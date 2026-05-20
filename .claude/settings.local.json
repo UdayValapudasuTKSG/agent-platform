@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls ~/.claude/skills/ 2>/dev/null; ls .claude/skills/ 2>/dev/null)",
+      "Read(//c/Users/UdayValapudasu/.claude/**)"
+    ]
+  }
+}

@@ -1,24 +1,23 @@
 import os
 import shutil
 
+TEMPLATE_PYPROJECT = "agent_templates/adk-conversational/pyproject.toml"
+
+
 def sync_templates():
-    template_path = "agent_templates/prompt-chaining"
     agents_root = "agents"
-    
-    # Files to sync (excluding those likely modified by developers like agent.py if they already exist)
-    # For now, let's just sync the structure but skip agent.py if it exists
-    files_to_sync = ["pyproject.toml"] 
-    
+    if not os.path.exists(TEMPLATE_PYPROJECT):
+        print(f"Template not found: {TEMPLATE_PYPROJECT}")
+        return
+
     for folder in os.listdir(agents_root):
         target_dir = os.path.join(agents_root, folder)
-        if os.path.isdir(target_dir):
-            print(f"Syncing {folder}...")
-            for f in files_to_sync:
-                src = os.path.join(template_path, f)
-                dst = os.path.join(target_dir, f)
-                if os.path.exists(src):
-                    shutil.copy2(src, dst)
-                    print(f"  Updated {f}")
+        if not os.path.isdir(target_dir):
+            continue
+        dst = os.path.join(target_dir, "pyproject.toml")
+        shutil.copy2(TEMPLATE_PYPROJECT, dst)
+        print(f"  Synced pyproject.toml -> {folder}")
+
 
 if __name__ == "__main__":
     sync_templates()
